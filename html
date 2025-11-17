@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Сервис сокращения URL</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        input[type="url"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #e8f5e8;
+            border-radius: 5px;
+            display: none;
+        }
+        .error {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f8d7da;
+            border-radius: 5px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Сервис сокращения URL</h1>
+        
+        <div class="form-group">
+            <input type="url" id="urlInput" placeholder="Введите URL для сокращения" required>
+        </div>
+        
+        <button onclick="createShortUrl()">Сократить URL</button>
+        
+        <div id="result" class="result"></div>
+        <div id="error" class="error"></div>
+    </div>
+
+    <script>
+        async function createShortUrl() {
+            const urlInput = document.getElementById('urlInput');
+            const resultDiv = document.getElementById('result');
+            const errorDiv = document.getElementById('error');
+            
+            const originalUrl = urlInput.value.trim();
+            
+            if (!originalUrl) {
+                showError('Пожалуйста, введите URL');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/create?url=${encodeURIComponent(originalUrl)}`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showResult(data);
+                } else {
+                    showError(data.error || 'Произошла ошибка');
+                }
+            } catch (error) {
+                showError('Ошибка сети: ' + error.message);
+            }
+        }
+        
+        function showResult(data) {
+            const resultDiv = document.getElementById('result');
+            const errorDiv = document.getElementById('error');
+            
+            errorDiv.style.display = 'none';
+            resultDiv.innerHTML = `
+                <strong>Оригинальный URL:</strong> ${data.original_url}<br>
+                <strong>Сокращенный URL:</strong> 
+                <a href="${data.short_url}" target="_blank">${data.short_url}</a>
+            `;
+            resultDiv.style.display = 'block';
+        }
+        
+        function showError(message) {
+            const resultDiv = document.getElementById('result');
+            const errorDiv = document.getElementById('error');
+            
+            resultDiv.style.display = 'none';
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+        }
+        
+       ').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                createShortUrl();
+            }
+        });
+    </script>
+</body>
+</html>
