@@ -1,0 +1,106 @@
+from flask import Flask, request, redirect, jsonify, render_template
+import string
+import random
+from database import get_db_connection, init_db
+
+app = Flask(__name__)
+BASE_URL = "http://localhost:5000"  # Можно изменить на ваш домен
+
+def generate_short_code(length=6):
+    characters = string.ascii_letters + string.digits
+    return ''.join(random.choice(characters) for _ in range(length))
+
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+@app.route('/create', methods=['GET'])
+def create_short_url():
+    original_url = request.args.get('url')
+    
+    if not original_url:
+        return jsonify({'error': 'Параметр url обязателен'}), 400
+    
+   
+    if not original_url.startswith(('http://', 'https://')):
+        original_url = 'http://' + original_url
+    
+    conn = get_db_connection()
+    
+    
+    existing_url = conn.execute(
+        'SELECT short_code FROM urls WHERE original_url = ?', 
+        (original_url,)
+    ).fetchone()
+    
+    if existing_url:
+        short_code = existing_url['short_code']
+    else:
+       
+        while True:
+            short_code = generate_short_code()
+           
+            if not conn.execute(
+                'SELECT id FROM urls WHERE short_code = ?', 
+                (short_code,)
+            ).fetchone():
+                break
+        
+     
+        conn.execute(
+            'INSERT INTO urls (original_url, short_code) VALUES (?, ?)',
+            (original_url, short_code)
+        )
+        conn.commit()
+    
+    conn.close()
+    
+    short_url = f"{BASE_URL}/{short_code}"
+    return jsonify({
+        'original_url': original_url,
+        'short_url': short_url,
+        'short_code': short_code
+    })
+
+@app.route('/<short_code>')
+def redirect_to_original(short_code):
+    """Перенаправление на оригинальный URL"""
+    conn = get_db_connection()
+    
+    url_data = conn.execute(
+        'SELECT original_url FROM urls WHERE short_code = ?', 
+        (short_code,)
+    ).fetchone()
+    
+    conn.close()
+    
+    if url_data:
+        return redirect(url_data['original_url'])
+    else:
+        return jsonify({'error': 'URL не найден'}), 404
+
+@app.route('/stats')
+def get_stats():
+   
+    conn = get_db_connection()
+    
+    urls = conn.execute(
+        'SELECT original_url, short_code, created_at FROM urls ORDER BY created_at DESC'
+    ).fetchall()
+    
+    conn.close()
+    
+    result = []
+    for url in urls:
+        result.append({
+            'original_url': url['original_url'],
+            'short_url': f"{BASE_URL}/{url['short_code']}",
+            'short_code': url['short_code'],
+            'created_at': url['created_at']
+        })
+    
+    return jsonify({'urls': result, 'total': len(result)})
+
+if __name__ == '__main__':
+    init_db()
+    app.run(debug=True, host='0.0.0.0', port=5000)
